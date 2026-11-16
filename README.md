@@ -1,4 +1,4 @@
-# Northwind IT Desk: an AI helpdesk agent
+# IT Support Desk: an AI helpdesk agent
 
 A small office (50–100 people) can't justify an expensive IT service-management tool, but it still needs to:
 
@@ -74,7 +74,7 @@ Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Anthropic TypeScript 
    pnpm dev
    ```
 
-Demo data is created on first run in `data/db.json`. Use **Reset demo data** at the bottom of the Tickets page to start again.
+Demo data is created on first run in `data/db.json`. It describes "Northwind", a made-up 50-person office with sample employees and computers. Replace `src/lib/seed.ts` with a real company's data. Use **Reset demo data** at the bottom of the Tickets page to start again.
 
 ### Things to try
 
