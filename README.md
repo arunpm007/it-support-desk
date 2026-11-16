@@ -1,119 +1,160 @@
-# IT Support Desk: an AI helpdesk agent
+<div align="center">
 
-A small office (50–100 people) can't justify an expensive IT service-management tool, but it still needs to:
+# IT Support Desk
+
+**An AI helpdesk agent for small offices.**
+Describe a computer problem in plain words. The agent checks the machine's history, suggests a fix, and raises a ticket on its own when the problem keeps coming back.
+
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React_19-149eca?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-0f172a?logo=tailwindcss&logoColor=38bdf8)
+![Claude API](https://img.shields.io/badge/Claude_API-tool_use_·_streaming-d97757)
+![Motion](https://img.shields.io/badge/Motion-animations-111111)
+
+*Personal portfolio project · runs on sample data for a made-up 50-person office*
+
+![The assistant answering "My laptop is very slow again": live agent steps, a device health card and a ticket list](docs/screenshots/assistant-chat.jpg)
+
+</div>
+
+---
+
+## Why I built it
+
+Small offices (20–100 people) rarely pay for a full IT service-management tool, but they still need to:
 
 - keep track of every computer and its repair history,
-- help non-technical staff of any age fix common problems themselves,
+- help **non-technical staff of any age** fix common problems themselves,
 - and raise a proper ticket when something needs a technician.
 
-This app does that with an **AI agent**. People describe a problem in their own words ("my laptop is slow again"). The agent looks up their computer, reads its repair history, finds a matching self-help guide, and raises a ticket when the problem keeps coming back or the hardware looks faulty.
+I wanted to show how an **AI agent** can do that job end to end, and how to make an AI product **feel trustworthy**: you see what it's doing, why, and what it changed.
 
-## What it does
+## Highlights
 
-| Screen | Who | What |
-|---|---|---|
-| **Get help** | Employees, IT staff | Chat with the agent. Under each answer, chips show exactly what the agent did ("Checked LAP-101 and its repair history", "Raised ticket TCK-1004"). |
-| **Dashboard** | IT staff | Number tiles, AI insights report, ticket pipeline, repairs per month, tickets by category, fleet health, high-priority tickets, recent activity and one-click "Quick asks" for the assistant. |
-| **Devices** | IT staff | Every computer: model, owner, age, repair count, open tickets. Old or often-repaired machines are highlighted. |
-| **Device detail** | IT staff | Specs, full repair history and tickets for one machine. |
-| **Tickets** | IT staff | All tickets, with filters, notes and status changes. Tickets raised by the agent are marked. |
+### 🤖 AI agent
+- **Real tool-using agent** on the Claude API. It decides which of **8 tools** to call (look up devices, read repair history, search fix guides, raise or update tickets, analyse the fleet), runs them, and keeps going until it can answer.
+- **Spots patterns, not just keywords.** "My laptop is slow *again*" → it sees 3 earlier repairs, an 8 GB machine over 5 years old, and an open ticket already covering it, so it **doesn't raise a duplicate**.
+- **Streams live.** The answer appears word by word, and a **timeline shows each tool call** as it starts (spinner), finishes (✓) or is blocked (✗). The first step appears in about 2 seconds.
+- **Generative UI.** Tools return structured data that the chat renders as **cards**: a device card with an animated health ring and repair timeline, a "ticket raised" card, a fleet health chart, and a "Try this first" checklist you can tick off.
+- **Structured AI insights.** On the dashboard, Claude reads the live numbers and returns a typed report (Zod schema): a headline, findings with severity, linked device and ticket IDs, and one recommended next step.
+- **Stop, Retry, follow-ups, history.** Stop a reply mid-way, retry after a network error, tap suggested follow-ups, and come back to **saved chats per profile**, which only that profile can open.
+
+### 🎨 UI and UX
+- **Framed glass workspace.** A collapsible rail plus one main surface (header, page and a collapsible inspector column) over a slowly drifting aurora background. Light and dark themes come from the same OKLCH design tokens.
+- **Forest green on warm sand**, with **amber reserved for the AI**, so warm always means "the assistant did this".
+- **⌘K command palette.** Jump to any device, ticket or chat, switch user, change theme, or type a question and press Enter to ask the assistant.
+- **Accessible charts, hand-built in SVG** (no chart library). The colours were **checked with a palette validator** for colour-blind separation and contrast in both themes, and every chart has a **Chart / Table** toggle and hover tooltips.
+- **Devices workspace** with search (`/`), filters, sorting, table/card views, **filters stored in the URL**, and a slide-in device panel with "✨ Ask AI about this device".
+- **Motion with restraint.** A sliding active highlight, spring-in messages, staggered lists and page transitions, all off for people who prefer reduced motion.
+- **Works on phones.** A floating dock, full-screen panels, and large readable text, because the promise is "usable by anyone in the office".
+
+## Screenshots
+
+| IT dashboard with AI insights | Dashboard charts (dark) |
+|---|---|
+| ![Dashboard with stat tiles and an AI insights report](docs/screenshots/dashboard.jpg) | ![Repairs per month, tickets by category and fleet health in dark mode](docs/screenshots/dashboard-charts-dark.jpg) |
+
+| Fleet answer with a chart card | Device panel with "Ask AI" (dark) |
+|---|---|
+| ![The assistant ranking computers to replace, with a health chart card](docs/screenshots/assistant-fleet.jpg) | ![Slide-in device panel with health ring, specs and repair timeline](docs/screenshots/devices-panel-dark.jpg) |
+
+| ⌘K command palette | On a phone |
+|---|---|
+| ![Command palette searching devices, tickets and chats](docs/screenshots/command-palette.jpg) | <img src="docs/screenshots/mobile-home.jpg" width="48%" alt="Phone: welcome screen"> <img src="docs/screenshots/mobile-device.jpg" width="48%" alt="Phone: device panel in dark mode"> |
 
 ## How the agent works
 
 ```
-User message
-   │
-   ▼
-┌──────────────────────────────┐      tool_use       ┌─────────────────────────┐
-│ Claude (model) + tool list   │ ──────────────────▶ │ Our code runs the tool  │
-│ decides what to do next      │ ◀────────────────── │ (with permission checks)│
-└──────────────────────────────┘     tool_result     └─────────────────────────┘
-   │  repeats until it has enough information
-   ▼
-Plain-language answer + list of actions taken
+ "My laptop is very slow again"
+            │
+            ▼
+┌───────────────────────────────┐   tool_use    ┌──────────────────────────────┐
+│ Claude + the tools this user  │ ────────────▶ │ My code runs the tool        │
+│ is allowed to use             │ ◀──────────── │ (permission checks, Zod)     │
+└───────────────────────────────┘  tool_result  └──────────────────────────────┘
+            │  repeats until it has enough to answer (max 8 rounds)
+            ▼
+ Streamed to the browser as events: tool started → tool finished (+ card data) → text
 ```
 
-- **The loop** ([src/lib/agent.ts](src/lib/agent.ts)) streams the conversation and the tool list to the model and passes live events (tool started, tool finished with card data, text) to the browser as newline-delimited JSON. If the model asks for tools, the app runs them (in parallel when there are several), sends the results back, and repeats. It stops when the model answers in text, or after 8 rounds as a safety limit.
-- **Tools** ([src/lib/tools.ts](src/lib/tools.ts)):
+| Tool | What it does | Employee | IT staff |
+|---|---|:-:|:-:|
+| `get_my_devices` | Who am I, which computers are mine | ✅ | |
+| `find_employee` | Search people | | ✅ |
+| `get_device_details` | Specs, health score, repair history, tickets | own only | ✅ |
+| `search_known_fixes` | Step-by-step self-help guides | ✅ | ✅ |
+| `create_ticket` | Raise a ticket | for themselves | ✅ |
+| `list_tickets` | Ticket status | own only | ✅ |
+| `update_ticket` | Change status, add a note | | ✅ |
+| `get_fleet_report` | Which machines to replace | | ✅ |
 
-  | Tool | Employee | IT staff |
-  |---|---|---|
-  | `get_my_devices`: who am I, which computers are mine | ✅ | |
-  | `find_employee`: search people | | ✅ |
-  | `get_device_details`: specs + repair history + tickets | own devices only | ✅ |
-  | `search_known_fixes`: self-help knowledge base | ✅ | ✅ |
-  | `create_ticket`: raise a ticket | for themselves only | ✅ |
-  | `list_tickets`: ticket status | own tickets only | ✅ |
-  | `update_ticket`: change status, add a note | | ✅ |
-  | `get_fleet_report`: which machines to replace | | ✅ |
+Key files: [`src/lib/agent.ts`](src/lib/agent.ts) (streaming agent loop) · [`src/lib/tools.ts`](src/lib/tools.ts) (tools and permissions) · [`src/lib/insights.ts`](src/lib/insights.ts) (structured AI report) · [`src/app/api/chat/route.ts`](src/app/api/chat/route.ts) (streaming API and saved history).
 
 ## Security decisions
 
-- **Permissions are enforced in code, not in the prompt.** Employees are never offered staff-only tools, and every tool checks again before it runs. Even if someone talks the model into trying, `get_device_details("DSK-201")` from another employee returns "This device is not assigned to you."
-- **Model output is untrusted input.** Every tool call is validated with Zod before it runs, on top of `strict: true` tool schemas.
-- **Who is asking comes from the server session.** The chat API reads the viewer from an httpOnly cookie, never from the request body, and pages and server actions check it before showing or changing data.
-- **Conversations are stored on the server.** The browser only holds an ID, so it can't rewrite what the model or the tools said earlier.
-- **Errors never crash the loop.** A failed tool returns `is_error: true` with a short message, so the model can explain or try something else.
-- **Refusals are handled.** The API is asked to retry on its recommended fallback model if a safety check declines a request (`fallbacks: "default"`).
+- **Permissions are enforced in code, not in the prompt.** Employees are never offered staff-only tools, and every tool checks again before it runs. Even if someone talks the model into it, opening another person's computer returns *"This device is not assigned to you."*
+- **Model output is treated as untrusted input.** Every tool call is validated with Zod, on top of `strict: true` tool schemas.
+- **Who is asking comes from the server session** (an httpOnly cookie), never from the request body. Pages, server actions and APIs all check it, so the insights API returns 403 to employees.
+- **Conversations are stored on the server**, so the browser can't rewrite what the model or the tools said. A stopped or failed turn is never saved half-finished.
+- **Questions passed between screens travel in session storage**, not the URL, so they never end up in browser history or server logs.
 
-## Tech
+## Tech stack
 
-Next.js 16 (App Router, Server Components, Server Actions) · TypeScript · Tailwind CSS 4 · shadcn/ui on Radix (accessible components) · Lucide icons · next-themes (light/dark) · cmdk (⌘K command palette) · Motion · Sonner · Anthropic TypeScript SDK (Claude, tool use) · Zod · a JSON-file store (easy to swap for PostgreSQL).
+**Frontend:** Next.js 16 (App Router, Server Components, Server Actions) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui on Radix · Motion · cmdk · Sonner · Lucide
+**AI:** Anthropic TypeScript SDK: tool use, streaming, structured outputs (Zod), refusal fallbacks
+**Data:** JSON-file store with a write queue (easy to swap for PostgreSQL); demo data with six months of history
 
-### UI highlights
-
-- "Floating glass workspace": a collapsible glass rail plus one framed main surface (header with title, centred search and actions; page; collapsible inspector column) over a slowly drifting aurora background, and a floating dock on phones.
-- Forest green on warm sand for the product, warm amber reserved for the assistant, so amber always means "the AI did this".
-- **Streaming agent UI:** the answer appears word by word, and a live timeline shows each tool call as it starts (spinner), finishes (tick) or is blocked. Once the turn ends it folds into a "4 steps · 9.8s" chip you can expand.
-- **Generative UI cards:** tools return structured data the chat shows as cards: a device card with an animated health ring and repair timeline, a "ticket raised" card, a tickets list, a fleet health chart, and a "Try this first" checklist you can tick off.
-- **Stop, Retry and follow-ups:** stop a reply mid-way (nothing half-finished is saved), retry after a network error, and tap suggested follow-up questions based on what the agent just did.
-- **Saved chat history per profile:** "Recent chats" in the rail (newest first, grouped by day), each chat at its own address, delete with confirm, and a History sheet on phones. Only the profile that started a chat can open it.
-- Context panel beside the chat: your devices with a health score, and your latest tickets. It refreshes after every reply.
-- **IT dashboard with AI insights:** Claude reads the live numbers and returns a *structured* report (Zod schema via structured outputs): a headline, 3–4 findings with severity and linked device or ticket IDs, and one recommended next step. The report is saved, so the page loads instantly.
-- **Charts built to a data-viz method:** hand-built SVG/HTML (no chart library), with chart colours checked by a palette validator for colour-blind separation and contrast in both themes, 4px rounded data ends and 2px gaps, hover tooltips, and a Chart/Table toggle on every chart.
-- **Devices workspace:** search (press `/`), filters for health, type, OS and status, sorting, a table/cards toggle and health chips that double as filters. Every filter lives in the URL, so a view can be bookmarked or shared. Clicking a device opens a slide-in panel (full-screen on phones) with an animated health ring, specs, repair timeline, tickets and an **"Ask AI about this device"** button that hands a ready-made question to the assistant.
-- Motion (Framer Motion): page transitions, a sliding active highlight in the menu and filters, spring-in messages, staggered lists.
-- **⌘K command palette:** jump to any page, device or ticket, switch who you're viewing as, change theme, or type a question and send it straight to the assistant.
-- Light and dark mode built on one set of design tokens (OKLCH colours).
-- Respects "reduce motion", has visible focus rings, and keeps text large and readable for non-technical users.
+```
+src/
+├─ app/                 pages: assistant, dashboard, devices, tickets + API routes
+├─ components/
+│  ├─ chat/             live agent timeline, generative cards, follow-ups
+│  ├─ dashboard/        stat tiles, SVG charts, AI insights, quick asks
+│  ├─ devices/          filters, table/cards, slide-in device panel
+│  └─ shell/            rail, header, ⌘K palette, mobile dock, theme
+└─ lib/                 agent, tools, insights, metrics, health score, session
+```
 
 ## Run it locally
 
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-2. Create a Claude API key at [platform.claude.com](https://platform.claude.com) → **API keys**, and add a little credit (a few dollars is plenty for a demo).
-3. Copy the example env file and paste your key into `.env.local`:
-   ```bash
-   cp .env.example .env.local
-   ```
-4. Start the app and open http://localhost:3000:
-   ```bash
-   pnpm dev
-   ```
+```bash
+pnpm install
+cp .env.example .env.local   # then paste your Claude API key into .env.local
+pnpm dev                     # http://localhost:3000
+```
 
-Demo data is created on first run in `data/db.json`. It describes "Northwind", a made-up 50-person office with sample employees and computers. Replace `src/lib/seed.ts` with a real company's data. Use **Reset demo data** at the bottom of the Tickets page to start again.
+You need a Claude API key from [platform.claude.com](https://platform.claude.com). A few dollars of credit is plenty for a demo.
 
-### Things to try
+### Try this
+1. As **Priya Sharma**, click **"My laptop is very slow again"**. Watch the live steps, the health ring, and the agent noticing her repeat repairs.
+2. Ask *"Show me the repair history of DSK-201"*. It isn't her computer, so access is refused.
+3. Switch to **IT Staff** (bottom of the sidebar), open the **Dashboard** and click **Generate insights**.
+4. Go to **Devices**, filter **At risk**, open a device and click **Ask AI about this device**.
+5. Press **⌘K** anywhere and type a question.
 
-- As **Priya Sharma**: "My laptop is very slow again". Her laptop has been repaired for slowness three times, so the agent should notice the pattern and raise a ticket instead of only repeating tips.
-- As **Priya**: "Show me the repair history of DSK-201". That isn't her computer, so access is refused.
-- As **IT staff**: "Which computers should we replace first?"
-- As **IT staff**: "Mark TCK-1002 as in progress, driver reinstall scheduled for Friday".
+Use **Reset demo data** at the bottom of the Tickets page (as IT staff) to start again.
 
-## Settings
-
-| Variable | Default | Meaning |
+| Setting | Default | Meaning |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | none | Required. |
-| `CLAUDE_MODEL` | `claude-opus-5-5` | Model ID. `claude-haiku-5-5` is much cheaper and fine for simple helpdesk chat. |
-| `CLAUDE_EFFORT` | `low` | `low`, `medium` or `high`. Higher means more careful reasoning but slower and costlier. |
+| `ANTHROPIC_API_KEY` | none | Required |
+| `CLAUDE_MODEL` | `claude-opus-5-5` | `claude-haiku-5-5` is much cheaper for simple helpdesk chat |
+| `CLAUDE_EFFORT` | `low` | `low`, `medium` or `high`: more careful reasoning, but slower |
 
-## Ideas for next steps
+## Roadmap
 
-- Stream answers token by token.
-- Swap the JSON store for PostgreSQL.
-- Real sign-in instead of the "You are" picker.
-- Agent-written weekly report for the IT manager.
-- Email or Slack alerts when an urgent ticket is raised.
+- [x] Tool-using agent with role-based permissions
+- [x] Streaming replies, live tool timeline, generative UI cards
+- [x] Saved chat history per profile
+- [x] IT dashboard with structured AI insights and accessible charts
+- [x] Devices workspace with URL filters and a slide-in panel
+- [ ] Tickets board (drag between Open → In progress → Resolved)
+- [ ] "How it works" case-study page
+- [ ] PostgreSQL and real sign-in
+- [ ] Email or Slack alerts for urgent tickets
+
+## About
+
+Built by **Arun P M**, frontend engineer focused on AI-powered products, design systems and interactive UI.
+
+[LinkedIn](https://www.linkedin.com/in/arun-p-m-3a9005225/) · [GitHub](https://github.com/arunpm007)
