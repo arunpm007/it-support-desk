@@ -1,101 +1,126 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { Inbox, Sparkles } from "lucide-react";
 import { PriorityBadge, StatusBadge } from "@/components/Badges";
+import { PageHeader } from "@/components/PageHeader";
+import { ScrollPage, enter } from "@/components/ScrollPage";
+import { Segmented } from "@/components/Segmented";
 import { readDb } from "@/lib/db";
-import { resetDemoData, setTicketStatus } from "./actions";
+import { getViewer } from "@/lib/session";
+import { cn } from "@/lib/utils";
+import { resetDemoData } from "./actions";
+import { StatusSelect } from "./StatusSelect";
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Tickets" };
 
-const FILTERS = ["all", "open", "in-progress", "resolved"] as const;
+const FILTERS = [
+  { value: "all", label: "All" },
+  { value: "open", label: "Open" },
+  { value: "in-progress", label: "In progress" },
+  { value: "resolved", label: "Resolved" },
+] as const;
 
 export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status = "all" } = await searchParams;
   const db = await readDb();
-  const tickets = db.tickets
+  const viewer = await getViewer(db);
+  const visible = db.tickets.filter(
+    (t) => viewer.isStaff || (viewer.actor.kind === "employee" && t.employeeId === viewer.actor.employeeId),
+  );
+  const tickets = visible
     .filter((t) => status === "all" || t.status === status)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Tickets</h1>
-        <p className="mt-1 text-slate-600">Raised by staff or by the assistant. Newest first.</p>
+    <ScrollPage className="max-w-4xl">
+      <PageHeader
+        title={viewer.isStaff ? "Tickets" : "My tickets"}
+        description={viewer.isStaff ? "Raised by staff or by the assistant. Newest first." : "Problems you've reported and where they stand."}
+      />
+
+      <div className="mb-5">
+        <Segmented
+          id="tickets"
+          label="Filter by status"
+          value={status}
+          items={FILTERS.map((f) => ({
+            value: f.value,
+            label: f.label,
+            href: f.value === "all" ? "/tickets" : `/tickets?status=${f.value}`,
+            count: f.value === "all" ? visible.length : visible.filter((t) => t.status === f.value).length,
+          }))}
+        />
       </div>
 
-      <nav className="flex flex-wrap gap-2" aria-label="Filter by status">
-        {FILTERS.map((f) => (
-          <Link
-            key={f}
-            href={f === "all" ? "/tickets" : `/tickets?status=${f}`}
-            className={`rounded-full px-4 py-1.5 text-[15px] capitalize ${status === f ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
-          >
-            {f.replace("-", " ")}
-          </Link>
-        ))}
-      </nav>
-
-      {tickets.length === 0 && <p className="text-slate-500">No tickets here.</p>}
+      {tickets.length === 0 && (
+        <div className="glass flex flex-col items-center gap-2 rounded-2xl py-14 text-center text-muted-foreground">
+          <Inbox className="size-6" />
+          No tickets here.
+        </div>
+      )}
 
       <ul className="flex flex-col gap-3">
-        {tickets.map((t) => {
+        {tickets.map((t, i) => {
           const who = db.employees.find((e) => e.id === t.employeeId);
+          const e = enter(i);
           return (
-            <li key={t.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <li
+              key={t.id}
+              id={t.id}
+              className={cn(
+                "glass scroll-mt-4 rounded-2xl p-4 transition-shadow hover:shadow-lg target:ring-2 target:ring-primary/50 sm:p-5",
+                e.className,
+              )}
+              style={e.style}
+            >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm text-slate-500">{t.id}</span>
+                <span className="font-mono text-xs text-muted-foreground">{t.id}</span>
                 <PriorityBadge value={t.priority} />
                 <StatusBadge value={t.status} />
                 {t.createdBy === "assistant" && (
-                  <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-[13px] font-medium text-violet-800 ring-1 ring-inset ring-violet-200">
-                    raised by assistant
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ai-soft px-2 py-0.5 text-xs font-medium text-ai-strong ring-1 ring-amber-500/20 ring-inset">
+                    <Sparkles className="size-3" /> Raised by assistant
                   </span>
                 )}
               </div>
-              <h2 className="mt-2 text-[17px] font-semibold">{t.title}</h2>
-              <p className="mt-1 whitespace-pre-line text-slate-700">{t.description}</p>
-              <div className="mt-2 text-sm text-slate-500">
-                {who?.name ?? t.employeeId} · {t.category}
+              <h2 className="mt-2.5 text-[16px] font-semibold">{t.title}</h2>
+              <p className="mt-1 text-sm whitespace-pre-line text-muted-foreground">{t.description}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span>{who?.name ?? t.employeeId}</span>·<span>{t.category}</span>
                 {t.deviceId && (
                   <>
-                    {" · "}
-                    <Link href={`/devices/${t.deviceId}`} className="font-mono text-indigo-700 hover:underline">
+                    ·
+                    <Link href={`/devices/${t.deviceId}`} className="font-mono text-primary hover:underline">
                       {t.deviceId}
                     </Link>
                   </>
                 )}
-                {" · "}
-                {new Date(t.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                ·<span>{new Date(t.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
               </div>
               {t.notes.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1 border-l-2 border-slate-200 pl-3 text-sm text-slate-600">
-                  {t.notes.map((n, i) => (
-                    <li key={i}>
-                      <span className="text-slate-400">{n.by}:</span> {n.text}
+                <ul className="mt-3 flex flex-col gap-1 border-l-2 border-primary/30 pl-3 text-sm text-muted-foreground">
+                  {t.notes.slice(-3).map((n, j) => (
+                    <li key={j}>
+                      <span className="text-foreground/70">{n.by}:</span> {n.text}
                     </li>
                   ))}
                 </ul>
               )}
-              <form action={setTicketStatus} className="mt-3 flex items-center gap-2">
-                <input type="hidden" name="id" value={t.id} />
-                <select
-                  name="status"
-                  defaultValue={t.status}
-                  aria-label={`Status for ${t.id}`}
-                  className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
-                >
-                  <option value="open">Open</option>
-                  <option value="in-progress">In progress</option>
-                  <option value="resolved">Resolved</option>
-                </select>
-                <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">Update</button>
-              </form>
+              {viewer.isStaff && (
+                <div className="mt-4">
+                  <StatusSelect id={t.id} status={t.status} />
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
 
-      <form action={resetDemoData} className="pt-4">
-        <button className="text-sm text-slate-500 underline-offset-2 hover:underline">Reset demo data</button>
-      </form>
-    </div>
+      {viewer.isStaff && (
+        <form action={resetDemoData} className="pt-6">
+          <button className="text-xs text-muted-foreground underline-offset-2 hover:underline">Reset demo data</button>
+        </form>
+      )}
+    </ScrollPage>
   );
 }

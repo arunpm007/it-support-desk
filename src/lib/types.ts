@@ -58,12 +58,32 @@ export type KnownFix = {
   steps: string[];
 };
 
+export type ChatStep = { tool: string; label: string; ok: boolean };
+
+/** What the screen shows for one message. */
+export type ChatMessage =
+  | { role: "user"; text: string; at: string }
+  | { role: "assistant"; text: string; steps: ChatStep[]; at: string };
+
+export type Conversation = {
+  id: string;
+  /** Profile that owns it ("staff" or an employee ID). Only that profile can open it. */
+  viewerKey: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+  /** Full model history (including tool calls) so the conversation can continue later. */
+  history: unknown[];
+};
+
 export type Db = {
   employees: Employee[];
   devices: Device[];
   repairs: RepairRecord[];
   tickets: Ticket[];
   knownFixes: KnownFix[];
+  conversations?: Conversation[];
 };
 
 /** Who is talking to the assistant. Decides which tools it gets and what data they can reach. */

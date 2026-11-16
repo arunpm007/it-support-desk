@@ -50,13 +50,26 @@ Plain-language answer + list of actions taken
 
 - **Permissions are enforced in code, not in the prompt.** Employees are never offered staff-only tools, and every tool checks again before it runs. Even if someone talks the model into trying, `get_device_details("DSK-201")` from another employee returns "This device is not assigned to you."
 - **Model output is untrusted input.** Every tool call is validated with Zod before it runs, on top of `strict: true` tool schemas.
+- **Who is asking comes from the server session.** The chat API reads the viewer from an httpOnly cookie, never from the request body, and pages and server actions check it before showing or changing data.
 - **Conversations are stored on the server.** The browser only holds an ID, so it can't rewrite what the model or the tools said earlier.
 - **Errors never crash the loop.** A failed tool returns `is_error: true` with a short message, so the model can explain or try something else.
 - **Refusals are handled.** The API is asked to retry on its recommended fallback model if a safety check declines a request (`fallbacks: "default"`).
 
 ## Tech
 
-Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Anthropic TypeScript SDK (Claude, tool use) · Zod · a JSON-file store (easy to swap for PostgreSQL).
+Next.js 16 (App Router, Server Components, Server Actions) · TypeScript · Tailwind CSS 4 · shadcn/ui on Radix (accessible components) · Lucide icons · next-themes (light/dark) · cmdk (⌘K command palette) · Motion · Sonner · Anthropic TypeScript SDK (Claude, tool use) · Zod · a JSON-file store (easy to swap for PostgreSQL).
+
+### UI highlights
+
+- "Floating glass workspace": frosted panels over a slowly drifting aurora background, a collapsible glass rail, and a floating dock on phones.
+- Teal for the product, warm amber reserved for the assistant, so warm always means "the AI did this".
+- Chat with a pinned composer, animated messages, a live "thinking" state, and error cards with Retry.
+- **Saved chat history per profile:** "Recent chats" in the rail (newest first, grouped by day), each chat at its own address, delete with confirm, and a History sheet on phones. Only the profile that started a chat can open it.
+- Context panel beside the chat: your devices with a health score, and your latest tickets. It refreshes after every reply.
+- Motion (Framer Motion): page transitions, a sliding active highlight in the menu and filters, spring-in messages, staggered lists.
+- **⌘K command palette:** jump to any page, device or ticket, switch who you're viewing as, change theme, or type a question and send it straight to the assistant.
+- Light and dark mode built on one set of design tokens (OKLCH colours).
+- Respects "reduce motion", has visible focus rings, and keeps text large and readable for non-technical users.
 
 ## Run it locally
 

@@ -1,6 +1,7 @@
 import type { Db } from "./types";
 
 export const seed: Db = {
+  conversations: [],
   employees: [
     { id: "E-001", name: "Priya Sharma", email: "priya@northwind.example", department: "Finance" },
     { id: "E-002", name: "Rahul Menon", email: "rahul@northwind.example", department: "Sales" },
