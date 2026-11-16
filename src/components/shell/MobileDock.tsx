@@ -10,7 +10,7 @@ export function MobileDock({ isStaff, openTickets }: { isStaff: boolean; openTic
   const pathname = usePathname();
   return (
     <nav aria-label="Main" className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 md:hidden">
-      <ul className="glass-strong grid grid-cols-3 rounded-[1.4rem] p-1.5">
+      <ul className={cn("glass-strong grid rounded-[1.4rem] p-1.5", isStaff ? "grid-cols-4" : "grid-cols-3")}>
         {navFor(isStaff).map((item) => {
           const active = isActive(pathname, item.href);
           return (

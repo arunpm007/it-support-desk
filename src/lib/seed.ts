@@ -1,3 +1,4 @@
+import { PAST_REPAIRS_SEED, PAST_TICKETS_SEED } from "./seed-history";
 import type { Db } from "./types";
 
 export const seed: Db = {
@@ -35,6 +36,7 @@ export const seed: Db = {
     { id: "R-008", deviceId: "LAP-105", date: "2026-01-08", issue: "Keyboard keys not working", fix: "Keyboard replaced under warranty", technician: "Kiran" },
     { id: "R-009", deviceId: "LAP-106", date: "2026-11-10", issue: "Screen flickering", fix: "Display cable ordered, device in repair", technician: "Deepa" },
     { id: "R-010", deviceId: "LAP-102", date: "2025-09-19", issue: "Outlook not syncing", fix: "Repaired Office installation, rebuilt profile", technician: "Kiran" },
+    ...PAST_REPAIRS_SEED,
   ],
   tickets: [
     {
@@ -54,6 +56,7 @@ export const seed: Db = {
       status: "resolved", createdAt: "2026-11-03T14:40:00.000Z", createdBy: "staff",
       notes: [{ at: "2026-11-04T06:10:00.000Z", by: "IT staff", text: "Saved VPN password updated. Working." }],
     },
+    ...PAST_TICKETS_SEED,
   ],
   knownFixes: [
     {

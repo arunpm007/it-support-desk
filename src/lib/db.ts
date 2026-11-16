@@ -21,12 +21,22 @@ async function save(db: Db) {
 
 export async function readDb(): Promise<Db> {
   try {
-    return JSON.parse(await fs.readFile(DB_PATH, "utf8")) as Db;
+    const db = JSON.parse(await fs.readFile(DB_PATH, "utf8")) as Db;
+    return withHistory(db);
   } catch {
     const fresh = structuredClone(seed);
     await save(fresh);
     return fresh;
   }
+}
+
+/** Adds the seeded past tickets and repairs to older databases, without touching live data. */
+function withHistory(db: Db): Db {
+  const tickets = new Set(db.tickets.map((t) => t.id));
+  const repairs = new Set(db.repairs.map((r) => r.id));
+  for (const t of seed.tickets) if (!tickets.has(t.id)) db.tickets.push(structuredClone(t));
+  for (const r of seed.repairs) if (!repairs.has(r.id)) db.repairs.push(structuredClone(r));
+  return db;
 }
 
 /** Read, change and save the database as one step. */

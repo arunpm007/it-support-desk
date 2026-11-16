@@ -314,7 +314,7 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
           const el = e.currentTarget;
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        className="fade-y min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-2"
+        className="fade-y min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-8"
       >
         <div className="mx-auto flex min-h-full max-w-3xl flex-col py-6">
           <AnimatePresence mode="popLayout" initial={false}>
@@ -461,7 +461,7 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
         </div>
       </div>
 
-      <div className="shrink-0 px-4 pt-2 pb-28 md:px-2 md:pb-1">
+      <div className="shrink-0 px-4 pt-2 pb-28 md:px-8 md:pb-3">
         <form
           onSubmit={(e) => {
             e.preventDefault();

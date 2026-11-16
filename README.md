@@ -13,6 +13,7 @@ This app does that with an **AI agent**. People describe a problem in their own 
 | Screen | Who | What |
 |---|---|---|
 | **Get help** | Employees, IT staff | Chat with the agent. Under each answer, chips show exactly what the agent did ("Checked LAP-101 and its repair history", "Raised ticket TCK-1004"). |
+| **Dashboard** | IT staff | Number tiles, AI insights report, ticket pipeline, repairs per month, tickets by category, fleet health, high-priority tickets, recent activity and one-click "Quick asks" for the assistant. |
 | **Devices** | IT staff | Every computer: model, owner, age, repair count, open tickets. Old or often-repaired machines are highlighted. |
 | **Device detail** | IT staff | Specs, full repair history and tickets for one machine. |
 | **Tickets** | IT staff | All tickets, with filters, notes and status changes. Tickets raised by the agent are marked. |
@@ -61,13 +62,16 @@ Next.js 16 (App Router, Server Components, Server Actions) · TypeScript · Tail
 
 ### UI highlights
 
-- "Floating glass workspace": frosted panels over a slowly drifting aurora background, a collapsible glass rail, and a floating dock on phones.
+- "Floating glass workspace": a collapsible glass rail plus one framed main surface (header with title, centred search and actions; page; collapsible inspector column) over a slowly drifting aurora background, and a floating dock on phones.
 - Forest green on warm sand for the product, warm amber reserved for the assistant, so amber always means "the AI did this".
 - **Streaming agent UI:** the answer appears word by word, and a live timeline shows each tool call as it starts (spinner), finishes (tick) or is blocked. Once the turn ends it folds into a "4 steps · 9.8s" chip you can expand.
 - **Generative UI cards:** tools return structured data the chat shows as cards: a device card with an animated health ring and repair timeline, a "ticket raised" card, a tickets list, a fleet health chart, and a "Try this first" checklist you can tick off.
 - **Stop, Retry and follow-ups:** stop a reply mid-way (nothing half-finished is saved), retry after a network error, and tap suggested follow-up questions based on what the agent just did.
 - **Saved chat history per profile:** "Recent chats" in the rail (newest first, grouped by day), each chat at its own address, delete with confirm, and a History sheet on phones. Only the profile that started a chat can open it.
 - Context panel beside the chat: your devices with a health score, and your latest tickets. It refreshes after every reply.
+- **IT dashboard with AI insights:** Claude reads the live numbers and returns a *structured* report (Zod schema via structured outputs): a headline, 3–4 findings with severity and linked device or ticket IDs, and one recommended next step. The report is saved, so the page loads instantly.
+- **Charts built to a data-viz method:** hand-built SVG/HTML (no chart library), with chart colours checked by a palette validator for colour-blind separation and contrast in both themes, 4px rounded data ends and 2px gaps, hover tooltips, and a Chart/Table toggle on every chart.
+- **Devices workspace:** search (press `/`), filters for health, type, OS and status, sorting, a table/cards toggle and health chips that double as filters. Every filter lives in the URL, so a view can be bookmarked or shared. Clicking a device opens a slide-in panel (full-screen on phones) with an animated health ring, specs, repair timeline, tickets and an **"Ask AI about this device"** button that hands a ready-made question to the assistant.
 - Motion (Framer Motion): page transitions, a sliding active highlight in the menu and filters, spring-in messages, staggered lists.
 - **⌘K command palette:** jump to any page, device or ticket, switch who you're viewing as, change theme, or type a question and send it straight to the assistant.
 - Light and dark mode built on one set of design tokens (OKLCH colours).

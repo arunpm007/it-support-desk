@@ -1,5 +1,8 @@
 import Chat from "@/components/Chat";
 import { ContextPanel } from "@/components/ContextPanel";
+import { Inspector } from "@/components/Inspector";
+import { INSPECTOR_COOKIE } from "@/components/shell/nav";
+import { cookies } from "next/headers";
 import { getConversation, listConversations } from "@/lib/conversations";
 import { readDb } from "@/lib/db";
 import { getViewer } from "@/lib/session";
@@ -9,9 +12,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const db = await readDb();
   const viewer = await getViewer(db);
   const convo = getConversation(db, c, viewer.key);
+  const inspectorHidden = (await cookies()).get(INSPECTOR_COOKIE)?.value === "true";
 
   return (
-    <div className="flex h-full gap-3">
+    <div className="flex h-full">
       <Chat
         key={`${viewer.key}:${convo?.id ?? "new"}`}
         firstName={viewer.name.split(" ")[0]}
@@ -21,7 +25,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
         recent={listConversations(db, viewer.key)}
         missing={Boolean(c) && !convo}
       />
-      <ContextPanel db={db} viewer={viewer} />
+      <Inspector title={viewer.isStaff ? "Overview" : "Your IT"} initiallyHidden={inspectorHidden}>
+        <ContextPanel db={db} viewer={viewer} />
+      </Inspector>
     </div>
   );
 }

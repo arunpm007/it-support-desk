@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lock, Wrench } from "lucide-react";
-import { PriorityBadge, StatusBadge } from "@/components/Badges";
-import { HealthBar, HealthPill } from "@/components/HealthPill";
+import { ArrowLeft, Laptop, Lock, Monitor } from "lucide-react";
+import { StatusBadge } from "@/components/Badges";
+import { DeviceDetails } from "@/components/devices/DeviceDetails";
 import { ScrollPage } from "@/components/ScrollPage";
-import { deviceHealth } from "@/lib/health";
-import { deviceAgeYears, readDb } from "@/lib/db";
+import { readDb } from "@/lib/db";
+import { deviceRows } from "@/lib/device-rows";
 import { getViewer } from "@/lib/session";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -16,13 +16,14 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const db = await readDb();
   const viewer = await getViewer(db);
-  const device = db.devices.find((d) => d.id === id.toUpperCase());
-  if (!device) notFound();
+  const exists = db.devices.some((d) => d.id === id.toUpperCase());
+  if (!exists) notFound();
 
-  const allowed = viewer.isStaff || (viewer.actor.kind === "employee" && device.assignedTo === viewer.actor.employeeId);
-  if (!allowed) {
+  // deviceRows already applies the viewer's permissions.
+  const d = deviceRows(db, viewer).find((r) => r.id === id.toUpperCase());
+  if (!d) {
     return (
-      <div className="mx-auto mt-16 flex max-w-md flex-col items-center gap-3 rounded-3xl p-10 text-center glass">
+      <div className="glass mx-auto mt-16 flex max-w-md flex-col items-center gap-3 rounded-3xl p-10 text-center">
         <span className="grid size-12 place-items-center rounded-2xl bg-foreground/[0.05] text-muted-foreground">
           <Lock className="size-5" />
         </span>
@@ -35,96 +36,27 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const owner = db.employees.find((e) => e.id === device.assignedTo);
-  const repairs = db.repairs.filter((r) => r.deviceId === device.id).sort((a, b) => b.date.localeCompare(a.date));
-  const tickets = db.tickets.filter((t) => t.deviceId === device.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  const facts = [
-    ["Model", device.model],
-    ["Type", device.type],
-    ["Operating system", device.os],
-    ["Memory", `${device.ramGB} GB`],
-    ["Storage", `${device.storageGB} GB`],
-    ["Purchased", `${device.purchased} · ${deviceAgeYears(device.purchased)} yrs`],
-    ["Assigned to", owner ? `${owner.name} · ${owner.department}` : "Unassigned"],
-  ];
-
-  const health = deviceHealth(device, db.repairs);
-
+  const Icon = d.type === "Laptop" ? Laptop : Monitor;
   return (
-    <ScrollPage className="flex max-w-4xl flex-col gap-8">
-      <div>
-        <Link href="/devices" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> {viewer.isStaff ? "All devices" : "My devices"}
-        </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">{device.model}</h1>
-          <StatusBadge value={device.status} />
-          <HealthPill health={health} />
+    <ScrollPage className="max-w-4xl">
+      <Link href="/devices" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="size-4" /> {viewer.isStaff ? "All devices" : "My devices"}
+      </Link>
+      <header className="mt-4 mb-6 flex items-center gap-4">
+        <span className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <Icon className="size-7" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">{d.model}</h1>
+            <StatusBadge value={d.status} />
+          </div>
+          <p className="mt-0.5 font-mono text-sm text-muted-foreground">{d.id}</p>
         </div>
-        <p className="mt-1 font-mono text-sm text-muted-foreground">{device.id}</p>
+      </header>
+      <div className="glass rounded-2xl p-5 sm:p-6">
+        <DeviceDetails d={d} isStaff={viewer.isStaff} />
       </div>
-
-      <div className="glass rounded-2xl p-5">
-        <div className="mb-5 flex flex-col gap-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">Health score</span>
-            <span className="text-muted-foreground">{health.reasons.join(" · ") || "No issues found"}</span>
-          </div>
-          <HealthBar health={health} />
-        </div>
-        <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-        {facts.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-xs text-muted-foreground">{k}</dt>
-            <dd className="mt-0.5 text-[15px]">{v}</dd>
-          </div>
-        ))}
-        </dl>
-      </div>
-
-      <section>
-        <h2 className="mb-3 text-base font-semibold">Repair history · {repairs.length}</h2>
-        {repairs.length === 0 ? (
-          <p className="text-muted-foreground">No repairs recorded.</p>
-        ) : (
-          <div className="glass relative rounded-2xl p-5 pl-8">
-            <span className="absolute top-6 bottom-6 left-8 w-px bg-border" aria-hidden />
-            <ol className="relative">
-            {repairs.map((r) => (
-              <li key={r.id} className="relative pb-6 pl-6 last:pb-0">
-                <span className="glass absolute -left-3 grid size-6 place-items-center rounded-full text-muted-foreground">
-                  <Wrench className="size-3" />
-                </span>
-                <div className="text-xs text-muted-foreground">
-                  {r.date} · {r.technician}
-                </div>
-                <div className="mt-0.5 font-medium">{r.issue}</div>
-                <div className="text-sm text-muted-foreground">{r.fix}</div>
-              </li>
-            ))}
-            </ol>
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-base font-semibold">Tickets · {tickets.length}</h2>
-        {tickets.length === 0 ? (
-          <p className="text-muted-foreground">No tickets for this device.</p>
-        ) : (
-          <div className="glass divide-y divide-glass-border overflow-hidden rounded-2xl">
-            {tickets.map((t) => (
-              <Link key={t.id} href={`/tickets#${t.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm hover:bg-foreground/[0.03]">
-                <span className="font-mono text-xs text-muted-foreground">{t.id}</span>
-                <span className="min-w-0 flex-1 truncate">{t.title}</span>
-                <PriorityBadge value={t.priority} />
-                <StatusBadge value={t.status} />
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
     </ScrollPage>
   );
 }

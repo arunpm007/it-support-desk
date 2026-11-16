@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   return (
     <DropdownMenu>
@@ -18,7 +18,7 @@ export function ThemeToggle() {
         <button
           type="button"
           aria-label="Change theme"
-          className="glass grid size-10 place-items-center rounded-full text-muted-foreground transition-all hover:text-foreground active:scale-95"
+          className={className ?? "grid size-9 place-items-center rounded-lg text-muted-foreground hover:text-foreground"}
         >
           <Sun className="size-[18px] transition-transform duration-500 dark:hidden" />
           <Moon className="hidden size-[18px] dark:block" />

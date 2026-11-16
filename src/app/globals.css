@@ -54,6 +54,16 @@
   --chart-4: oklch(0.62 0.13 40);
   --chart-5: oklch(0.55 0.03 250);
 
+  /* Chart colours, checked with the palette validator against the light surface. */
+  --viz-series: #1a8a5a;
+  --viz-good: #10b981;
+  --viz-fair: #f59e0b;
+  --viz-risk: #f43f5e;
+  --viz-open: #c2410c;
+  --viz-progress: #d99a06;
+  --viz-resolved: #059669;
+  --viz-grid: oklch(0.3 0.03 90 / 10%);
+
   --radius: 0.8rem;
 }
 
@@ -100,6 +110,16 @@
   --chart-3: oklch(0.82 0.15 76);
   --chart-4: oklch(0.72 0.13 40);
   --chart-5: oklch(0.7 0.03 250);
+
+  /* Chart colours for the dark surface (separately validated, not a flip). */
+  --viz-series: #22a06b;
+  --viz-good: #059669;
+  --viz-fair: #d97706;
+  --viz-risk: #e11d48;
+  --viz-open: #c2410c;
+  --viz-progress: #b8860b;
+  --viz-resolved: #059669;
+  --viz-grid: oklch(1 0 0 / 8%);
 }
 
 @theme inline {
@@ -202,6 +222,17 @@
   box-shadow:
     inset 0 1px 0 0 var(--glass-highlight),
     0 20px 60px -20px var(--glass-shadow);
+}
+
+/* The main workspace frame: one calm surface that holds the header, page and inspector. */
+@utility surface {
+  background: color-mix(in oklch, var(--background) 55%, transparent);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    0 24px 60px -30px var(--glass-shadow);
 }
 
 @utility bg-brand {

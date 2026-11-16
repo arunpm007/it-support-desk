@@ -105,6 +105,8 @@ export type Db = {
   tickets: Ticket[];
   knownFixes: KnownFix[];
   conversations?: Conversation[];
+  /** Last AI insights report for the dashboard. */
+  insights?: { generatedAt: string; data: unknown };
 };
 
 /** Who is talking to the assistant. Decides which tools it gets and what data they can reach. */

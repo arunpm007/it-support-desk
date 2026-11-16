@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 export function ScrollPage({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className="h-full overflow-y-auto overscroll-contain">
-      <div className={cn("mx-auto w-full px-4 pt-2 pb-32 md:px-2 md:pb-8", className)}>{children}</div>
+      <div className={cn("mx-auto w-full px-4 pt-2 pb-32 md:px-8 md:pt-7 md:pb-10", className)}>{children}</div>
     </div>
   );
 }

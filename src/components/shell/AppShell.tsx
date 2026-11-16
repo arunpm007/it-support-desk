@@ -11,8 +11,8 @@ import type { ShellData } from "./types";
 
 /**
  * Floating glass workspace: an aurora background, a glass rail on the left,
- * and the page area. Each page scrolls inside its own column so the chat can
- * pin its composer to the bottom.
+ * and one framed surface for the page. Each page scrolls inside its own
+ * column so the chat can pin its composer to the bottom.
  */
 export function AppShell({ data, railCollapsed, children }: { data: ShellData; railCollapsed: boolean; children: React.ReactNode }) {
   return (
@@ -20,7 +20,8 @@ export function AppShell({ data, railCollapsed, children }: { data: ShellData; r
       <Aurora />
       <div className="flex h-svh gap-3 md:p-3">
         <Rail data={data} initiallyCollapsed={railCollapsed} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        {/* One framed surface: header on top, then the page (and its inspector). */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden md:surface md:rounded-[1.4rem]">
           <TopBar data={data} />
           <main id="main" className="relative min-h-0 flex-1">
             {children}
