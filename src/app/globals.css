@@ -5,101 +5,101 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design tokens: "Teal + warm amber".
- * Teal is the product colour (calm, trustworthy, "support").
+ * Design tokens: "Forest green + sand".
+ * Forest green is the product colour (calm, grounded, "things get fixed").
  * Amber is reserved for the assistant, so warm = the AI is involved.
  * Surfaces are frosted glass floating over a slow aurora background.
  */
 :root {
   color-scheme: light;
-  --background: oklch(0.972 0.008 200);
-  --foreground: oklch(0.23 0.025 222);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.23 0.025 222);
-  --popover: oklch(0.995 0.003 200);
-  --popover-foreground: oklch(0.23 0.025 222);
-  --primary: oklch(0.53 0.095 190);
-  --primary-foreground: oklch(0.99 0.005 190);
-  --secondary: oklch(0.94 0.012 200);
-  --secondary-foreground: oklch(0.28 0.03 220);
-  --muted: oklch(0.94 0.01 205);
-  --muted-foreground: oklch(0.5 0.022 222);
-  --accent: oklch(0.93 0.03 190);
-  --accent-foreground: oklch(0.3 0.06 195);
-  --destructive: oklch(0.577 0.215 27);
-  --border: oklch(0.25 0.03 220 / 10%);
-  --input: oklch(0.25 0.03 220 / 14%);
-  --ring: oklch(0.62 0.1 190);
+  --background: oklch(0.962 0.013 85);
+  --foreground: oklch(0.24 0.018 150);
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.24 0.018 150);
+  --popover: oklch(0.99 0.006 85);
+  --popover-foreground: oklch(0.24 0.018 150);
+  --primary: oklch(0.47 0.075 160);
+  --primary-foreground: oklch(0.985 0.01 90);
+  --secondary: oklch(0.93 0.016 88);
+  --secondary-foreground: oklch(0.3 0.03 150);
+  --muted: oklch(0.93 0.014 88);
+  --muted-foreground: oklch(0.5 0.022 120);
+  --accent: oklch(0.92 0.03 150);
+  --accent-foreground: oklch(0.3 0.05 155);
+  --destructive: oklch(0.56 0.19 30);
+  --border: oklch(0.32 0.03 90 / 12%);
+  --input: oklch(0.32 0.03 90 / 16%);
+  --ring: oklch(0.55 0.08 160);
 
   --ai: oklch(0.78 0.155 72);
-  --ai-strong: oklch(0.56 0.14 58);
-  --ai-soft: oklch(0.96 0.045 82);
+  --ai-strong: oklch(0.54 0.13 58);
+  --ai-soft: oklch(0.95 0.05 85);
 
-  --brand-from: oklch(0.6 0.105 188);
-  --brand-to: oklch(0.62 0.12 228);
+  --brand-from: oklch(0.5 0.08 160);
+  --brand-to: oklch(0.6 0.09 128);
 
-  --glass: oklch(1 0 0 / 58%);
-  --glass-strong: oklch(1 0 0 / 78%);
-  --glass-border: oklch(0.3 0.04 220 / 9%);
+  --glass: oklch(0.995 0.006 85 / 60%);
+  --glass-strong: oklch(0.995 0.006 85 / 82%);
+  --glass-border: oklch(0.35 0.03 90 / 11%);
   --glass-highlight: oklch(1 0 0 / 85%);
-  --glass-shadow: oklch(0.35 0.06 220 / 14%);
+  --glass-shadow: oklch(0.35 0.04 80 / 16%);
 
-  --aurora-1: oklch(0.82 0.1 185 / 55%);
-  --aurora-2: oklch(0.85 0.08 230 / 50%);
-  --aurora-3: oklch(0.9 0.11 80 / 45%);
+  --aurora-1: oklch(0.85 0.06 150 / 60%);
+  --aurora-2: oklch(0.88 0.07 50 / 50%);
+  --aurora-3: oklch(0.92 0.08 90 / 55%);
 
-  --chart-1: oklch(0.6 0.1 188);
-  --chart-2: oklch(0.65 0.12 230);
+  --chart-1: oklch(0.5 0.08 160);
+  --chart-2: oklch(0.62 0.1 128);
   --chart-3: oklch(0.78 0.155 72);
-  --chart-4: oklch(0.66 0.15 155);
-  --chart-5: oklch(0.64 0.17 20);
+  --chart-4: oklch(0.62 0.13 40);
+  --chart-5: oklch(0.55 0.03 250);
 
   --radius: 0.8rem;
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.165 0.02 218);
-  --foreground: oklch(0.95 0.01 200);
-  --card: oklch(0.205 0.022 218);
-  --card-foreground: oklch(0.95 0.01 200);
-  --popover: oklch(0.22 0.024 218);
-  --popover-foreground: oklch(0.95 0.01 200);
-  --primary: oklch(0.76 0.115 186);
-  --primary-foreground: oklch(0.2 0.04 200);
-  --secondary: oklch(0.26 0.025 218);
-  --secondary-foreground: oklch(0.95 0.01 200);
-  --muted: oklch(0.25 0.022 218);
-  --muted-foreground: oklch(0.72 0.02 210);
-  --accent: oklch(0.3 0.045 195);
-  --accent-foreground: oklch(0.95 0.02 190);
-  --destructive: oklch(0.7 0.19 22);
+  --background: oklch(0.17 0.012 160);
+  --foreground: oklch(0.95 0.012 95);
+  --card: oklch(0.21 0.014 160);
+  --card-foreground: oklch(0.95 0.012 95);
+  --popover: oklch(0.225 0.015 160);
+  --popover-foreground: oklch(0.95 0.012 95);
+  --primary: oklch(0.78 0.1 155);
+  --primary-foreground: oklch(0.2 0.03 160);
+  --secondary: oklch(0.26 0.015 160);
+  --secondary-foreground: oklch(0.95 0.012 95);
+  --muted: oklch(0.25 0.014 160);
+  --muted-foreground: oklch(0.73 0.02 120);
+  --accent: oklch(0.3 0.04 155);
+  --accent-foreground: oklch(0.95 0.02 150);
+  --destructive: oklch(0.7 0.17 28);
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.76 0.115 186);
+  --ring: oklch(0.78 0.1 155);
 
   --ai: oklch(0.82 0.15 76);
   --ai-strong: oklch(0.84 0.14 78);
   --ai-soft: oklch(0.32 0.06 70 / 55%);
 
-  --brand-from: oklch(0.7 0.12 186);
-  --brand-to: oklch(0.68 0.12 232);
+  --brand-from: oklch(0.66 0.1 158);
+  --brand-to: oklch(0.72 0.1 125);
 
-  --glass: oklch(0.24 0.025 218 / 52%);
-  --glass-strong: oklch(0.24 0.025 218 / 78%);
+  --glass: oklch(0.24 0.016 160 / 52%);
+  --glass-strong: oklch(0.24 0.016 160 / 80%);
   --glass-border: oklch(1 0 0 / 8%);
   --glass-highlight: oklch(1 0 0 / 7%);
   --glass-shadow: oklch(0 0 0 / 45%);
 
-  --aurora-1: oklch(0.45 0.1 188 / 45%);
-  --aurora-2: oklch(0.42 0.11 235 / 40%);
-  --aurora-3: oklch(0.55 0.12 70 / 22%);
+  --aurora-1: oklch(0.42 0.08 155 / 45%);
+  --aurora-2: oklch(0.45 0.08 55 / 24%);
+  --aurora-3: oklch(0.5 0.1 85 / 20%);
 
-  --chart-1: oklch(0.76 0.115 186);
-  --chart-2: oklch(0.72 0.12 232);
+  --chart-1: oklch(0.78 0.1 155);
+  --chart-2: oklch(0.76 0.1 125);
   --chart-3: oklch(0.82 0.15 76);
-  --chart-4: oklch(0.74 0.15 155);
-  --chart-5: oklch(0.7 0.17 20);
+  --chart-4: oklch(0.72 0.13 40);
+  --chart-5: oklch(0.7 0.03 250);
 }
 
 @theme inline {
@@ -179,7 +179,7 @@
     font-feature-settings: "cv11", "ss01";
   }
   ::selection {
-    background: color-mix(in oklch, var(--primary) 28%, transparent);
+    background: color-mix(in oklch, var(--primary) 25%, transparent);
   }
 }
 
@@ -260,7 +260,7 @@
   border-radius: calc(var(--radius) * 0.7) !important;
 }
 [data-slot="dialog-overlay"] {
-  background: oklch(0.2 0.03 220 / 25%) !important;
+  background: oklch(0.22 0.02 150 / 25%) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }

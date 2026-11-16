@@ -2,11 +2,11 @@ import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TONES = [
-  "from-sky-200 to-sky-300 text-sky-900 dark:from-sky-400/30 dark:to-sky-500/20 dark:text-sky-100",
+  "from-stone-200 to-stone-300 text-stone-800 dark:from-stone-300/25 dark:to-stone-400/15 dark:text-stone-100",
   "from-amber-200 to-orange-200 text-amber-900 dark:from-amber-400/30 dark:to-orange-500/20 dark:text-amber-100",
-  "from-emerald-200 to-teal-200 text-emerald-900 dark:from-emerald-400/30 dark:to-teal-500/20 dark:text-emerald-100",
+  "from-emerald-200 to-green-200 text-emerald-900 dark:from-emerald-400/30 dark:to-green-500/20 dark:text-emerald-100",
   "from-rose-200 to-pink-200 text-rose-900 dark:from-rose-400/30 dark:to-pink-500/20 dark:text-rose-100",
-  "from-cyan-200 to-teal-200 text-cyan-900 dark:from-cyan-400/30 dark:to-teal-500/20 dark:text-cyan-100",
+  "from-lime-200 to-green-200 text-green-900 dark:from-lime-400/25 dark:to-green-500/20 dark:text-lime-100",
   "from-lime-200 to-emerald-200 text-lime-900 dark:from-lime-400/25 dark:to-emerald-500/20 dark:text-lime-100",
 ];
 

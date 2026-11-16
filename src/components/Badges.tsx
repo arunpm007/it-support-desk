@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<string, { cls: string; dot: string }> = {
-  open: { cls: "bg-sky-50 text-sky-700 ring-sky-600/15 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/20", dot: "bg-sky-500" },
+  open: { cls: "bg-stone-100 text-stone-700 ring-stone-600/20 dark:bg-stone-300/10 dark:text-stone-200 dark:ring-stone-300/20", dot: "bg-stone-500 dark:bg-stone-300" },
   "in-progress": {
     cls: "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20",
     dot: "bg-amber-500",
@@ -23,7 +23,7 @@ const STATUS_STYLE: Record<string, { cls: string; dot: string }> = {
 
 const PRIORITY_STYLE: Record<string, string> = {
   low: "bg-muted text-muted-foreground ring-border",
-  medium: "bg-sky-50 text-sky-700 ring-sky-600/15 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/20",
+  medium: "bg-lime-50 text-lime-800 ring-lime-700/20 dark:bg-lime-300/10 dark:text-lime-200 dark:ring-lime-300/20",
   high: "bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-400/10 dark:text-orange-300 dark:ring-orange-400/20",
   urgent: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25",
 };

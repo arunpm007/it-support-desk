@@ -8,7 +8,7 @@ import type { TicketStatus } from "@/lib/types";
 import { updateTicketStatus } from "./actions";
 
 const OPTIONS: { value: TicketStatus; label: string; icon: typeof CircleDot; tone: string }[] = [
-  { value: "open", label: "Open", icon: CircleDot, tone: "text-sky-600 dark:text-sky-300" },
+  { value: "open", label: "Open", icon: CircleDot, tone: "text-stone-500 dark:text-stone-300" },
   { value: "in-progress", label: "In progress", icon: Timer, tone: "text-amber-600 dark:text-amber-300" },
   { value: "resolved", label: "Resolved", icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-300" },
 ];

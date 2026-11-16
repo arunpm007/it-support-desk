@@ -49,7 +49,7 @@ export function ContextPanel({ db, viewer }: { db: Db; viewer: Viewer }) {
         <Panel title="At a glance" index={0}>
           <dl className="grid grid-cols-3 gap-2 text-center">
             {[
-              { k: "Open", v: open, tone: "text-sky-600 dark:text-sky-300" },
+              { k: "Open", v: open, tone: "text-foreground" },
               { k: "In progress", v: progress, tone: "text-amber-600 dark:text-amber-300" },
               { k: "At risk", v: atRisk.length, tone: "text-rose-600 dark:text-rose-300" },
             ].map((s) => (

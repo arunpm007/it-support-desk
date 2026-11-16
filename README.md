@@ -62,7 +62,7 @@ Next.js 16 (App Router, Server Components, Server Actions) · TypeScript · Tail
 ### UI highlights
 
 - "Floating glass workspace": frosted panels over a slowly drifting aurora background, a collapsible glass rail, and a floating dock on phones.
-- Teal for the product, warm amber reserved for the assistant, so warm always means "the AI did this".
+- Forest green on warm sand for the product, warm amber reserved for the assistant, so amber always means "the AI did this".
 - **Streaming agent UI:** the answer appears word by word, and a live timeline shows each tool call as it starts (spinner), finishes (tick) or is blocked. Once the turn ends it folds into a "4 steps · 9.8s" chip you can expand.
 - **Generative UI cards:** tools return structured data the chat shows as cards: a device card with an animated health ring and repair timeline, a "ticket raised" card, a tickets list, a fleet health chart, and a "Try this first" checklist you can tick off.
 - **Stop, Retry and follow-ups:** stop a reply mid-way (nothing half-finished is saved), retry after a network error, and tap suggested follow-up questions based on what the agent just did.
