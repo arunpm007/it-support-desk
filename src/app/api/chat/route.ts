@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { BetaMessageParam } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { runAgent } from "@/lib/agent";
+import { streamAgent, type AgentEvent } from "@/lib/agent";
 import { getConversation, titleFrom } from "@/lib/conversations";
 import { readDb, updateDb } from "@/lib/db";
 import { getViewer } from "@/lib/session";
@@ -16,10 +16,24 @@ const Body = z.object({
   message: z.string().trim().min(1).max(2000),
 });
 
+export type StreamEvent = AgentEvent | { type: "start"; conversationId: string } | { type: "error"; message: string };
+
 function error(status: number, message: string) {
   return Response.json({ error: message }, { status });
 }
 
+function friendly(err: unknown) {
+  if (err instanceof Anthropic.AuthenticationError) return "The API key was rejected. Check ANTHROPIC_API_KEY.";
+  if (err instanceof Anthropic.RateLimitError) return "Too many requests right now. Please wait a minute.";
+  if (err instanceof Anthropic.APIError) return "The AI service had a problem. Please try again.";
+  return "Something went wrong. Please try again.";
+}
+
+/**
+ * Streams newline-delimited JSON events so the chat can show each step live.
+ * The turn is saved only when it finishes; a stopped or failed turn leaves the
+ * saved conversation untouched.
+ */
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return error(400, "Please type a message.");
@@ -37,38 +51,54 @@ export async function POST(req: Request) {
   const existing = getConversation(db, parsed.data.conversationId ?? undefined, viewer.key);
   const id = existing?.id ?? randomUUID();
   if (busy.has(id)) return error(409, "Still working on your last message.");
-
   busy.add(id);
+
   const history = [...((existing?.history ?? []) as BetaMessageParam[]), { role: "user", content: message } as BetaMessageParam];
   const askedAt = new Date().toISOString();
-  try {
-    const result = await runAgent(history, viewer.actor);
-    const now = new Date().toISOString();
+  const encoder = new TextEncoder();
 
-    await updateDb((d) => {
-      d.conversations ??= [];
-      let convo = d.conversations.find((c) => c.id === id && c.viewerKey === viewer.key);
-      if (!convo) {
-        convo = { id, viewerKey: viewer.key, title: titleFrom(message), createdAt: askedAt, updatedAt: now, messages: [], history: [] } as Conversation;
-        d.conversations.push(convo);
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (e: StreamEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
+      try {
+        send({ type: "start", conversationId: id });
+        for await (const event of streamAgent(history, viewer.actor, req.signal)) {
+          if (event.type === "done") {
+            const now = new Date().toISOString();
+            await updateDb((d) => {
+              d.conversations ??= [];
+              let convo = d.conversations.find((c) => c.id === id && c.viewerKey === viewer.key);
+              if (!convo) {
+                convo = { id, viewerKey: viewer.key, title: titleFrom(message), createdAt: askedAt, updatedAt: now, messages: [], history: [] } as Conversation;
+                d.conversations.push(convo);
+              }
+              convo.history = history;
+              convo.messages.push(
+                { role: "user", text: message, at: askedAt },
+                { role: "assistant", text: event.reply, steps: event.steps, at: now },
+              );
+              convo.updatedAt = now;
+            });
+          }
+          send(event);
+        }
+      } catch (err) {
+        if (!req.signal.aborted) {
+          console.error("[chat]", err instanceof Anthropic.APIError ? `${err.status} ${err.message}` : err);
+          send({ type: "error", message: friendly(err) });
+        }
+      } finally {
+        busy.delete(id);
+        try {
+          controller.close();
+        } catch {
+          // already closed because the browser stopped listening
+        }
       }
-      convo.history = history;
-      convo.messages.push({ role: "user", text: message, at: askedAt }, { role: "assistant", text: result.reply, steps: result.steps, at: now });
-      convo.updatedAt = now;
-    });
+    },
+  });
 
-    return Response.json({ conversationId: id, ...result });
-  } catch (err) {
-    // Nothing is saved for a failed turn, so the conversation stays valid.
-    if (err instanceof Anthropic.AuthenticationError) return error(401, "The API key was rejected. Check ANTHROPIC_API_KEY.");
-    if (err instanceof Anthropic.RateLimitError) return error(429, "Too many requests right now. Please wait a minute.");
-    if (err instanceof Anthropic.APIError) {
-      console.error("[chat] API error", err.status, err.message);
-      return error(502, "The AI service had a problem. Please try again.");
-    }
-    console.error("[chat]", err);
-    return error(500, "Something went wrong. Please try again.");
-  } finally {
-    busy.delete(id);
-  }
+  return new Response(body, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache, no-transform" },
+  });
 }

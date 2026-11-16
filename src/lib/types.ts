@@ -58,7 +58,28 @@ export type KnownFix = {
   steps: string[];
 };
 
-export type ChatStep = { tool: string; label: string; ok: boolean };
+/** Structured data a tool hands to the chat so it can show a rich card instead of plain text. */
+export type ChatCard =
+  | {
+      kind: "device";
+      device: { id: string; model: string; type: string; os: string; ramGB: number; ageYears: number; status: string; owner: string };
+      health: { score: number; label: "Good" | "Fair" | "At risk"; reasons: string[] };
+      repairs: { date: string; issue: string }[];
+    }
+  | { kind: "devices"; devices: { id: string; model: string; type: string; score: number; label: "Good" | "Fair" | "At risk" }[] }
+  | {
+      kind: "ticket";
+      action: "created" | "updated";
+      ticket: { id: string; title: string; status: string; priority: string; category: string; deviceId: string | null };
+    }
+  | { kind: "tickets"; tickets: { id: string; title: string; status: string; priority: string }[] }
+  | { kind: "fix"; title: string; steps: string[] }
+  | {
+      kind: "fleet";
+      devices: { id: string; model: string; owner: string; score: number; label: "Good" | "Fair" | "At risk"; reasons: string[] }[];
+    };
+
+export type ChatStep = { tool: string; label: string; ok: boolean; card?: ChatCard };
 
 /** What the screen shows for one message. */
 export type ChatMessage =

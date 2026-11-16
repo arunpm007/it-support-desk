@@ -1,7 +1,8 @@
 import type { BetaTool } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { z } from "zod";
 import { deviceAgeYears, readDb, updateDb } from "./db";
-import type { Actor, Db, Ticket } from "./types";
+import { deviceHealth } from "./health";
+import type { Actor, ChatCard, ChatStep, Db, Ticket } from "./types";
 
 /**
  * Tools are the agent's hands: plain functions the model can ask us to run.
@@ -9,8 +10,20 @@ import type { Actor, Db, Ticket } from "./types";
  * Every permission check happens here in code, never in the prompt.
  */
 
-export type ToolStep = { tool: string; label: string; ok: boolean };
-type ToolOutput = { result: unknown; label: string };
+export type ToolStep = ChatStep;
+type ToolOutput = { result: unknown; label: string; card?: ChatCard };
+
+/** Shown while a tool is running, before we know its result. */
+export const PENDING_LABEL: Record<string, string> = {
+  get_my_devices: "Looking up your devices",
+  find_employee: "Searching people",
+  get_device_details: "Reading the repair history",
+  search_known_fixes: "Searching the fix guides",
+  create_ticket: "Raising a ticket",
+  list_tickets: "Checking tickets",
+  update_ticket: "Updating the ticket",
+  get_fleet_report: "Analysing every device",
+};
 type ToolDef = {
   schema: BetaTool;
   input: z.ZodType;
@@ -31,6 +44,10 @@ function ownsDevice(db: Db, actor: Actor, deviceId: string) {
 function nextTicketId(db: Db) {
   const max = db.tickets.reduce((m, t) => Math.max(m, Number(t.id.split("-")[1]) || 0), 1000);
   return `TCK-${max + 1}`;
+}
+
+function pickTicket(t: Ticket) {
+  return { id: t.id, title: t.title, status: t.status, priority: t.priority, category: t.category, deviceId: t.deviceId };
 }
 
 function scoreFix(text: string, keywords: string[]) {
@@ -58,7 +75,19 @@ const defs: Record<string, ToolDef> = {
       const devices = db.devices
         .filter((d) => d.assignedTo === me.id)
         .map((d) => ({ ...d, ageYears: deviceAgeYears(d.purchased) }));
-      return { result: { employee: me, devices }, label: `Looked up ${me.name.split(" ")[0]}'s devices` };
+      return {
+        result: { employee: me, devices },
+        label: `Looked up ${me.name.split(" ")[0]}'s devices`,
+        card: {
+          kind: "devices",
+          devices: db.devices
+            .filter((d) => d.assignedTo === me.id)
+            .map((d) => {
+              const h = deviceHealth(d, db.repairs);
+              return { id: d.id, model: d.model, type: d.type, score: h.score, label: h.label };
+            }),
+        },
+      };
     },
   },
 
@@ -107,13 +136,31 @@ const defs: Record<string, ToolDef> = {
       const device = db.devices.find((d) => d.id === id);
       if (!device) throw new ToolError(`No device with ID ${id}`);
       if (!ownsDevice(db, actor, id)) throw new ToolError("This device is not assigned to you.");
+      const repairHistory = db.repairs.filter((r) => r.deviceId === id).sort((a, b) => b.date.localeCompare(a.date));
+      const health = deviceHealth(device, db.repairs);
       return {
         result: {
           device: { ...device, ageYears: deviceAgeYears(device.purchased) },
-          repairHistory: db.repairs.filter((r) => r.deviceId === id).sort((a, b) => b.date.localeCompare(a.date)),
+          health,
+          repairHistory,
           tickets: db.tickets.filter((t) => t.deviceId === id),
         },
         label: `Checked ${id} and its repair history`,
+        card: {
+          kind: "device",
+          device: {
+            id: device.id,
+            model: device.model,
+            type: device.type,
+            os: device.os,
+            ramGB: device.ramGB,
+            ageYears: deviceAgeYears(device.purchased),
+            status: device.status,
+            owner: db.employees.find((e) => e.id === device.assignedTo)?.name ?? "Unassigned",
+          },
+          health,
+          repairs: repairHistory.map((r) => ({ date: r.date, issue: r.issue })),
+        },
       };
     },
   },
@@ -143,6 +190,7 @@ const defs: Record<string, ToolDef> = {
       return {
         result: articles.length ? { articles } : { articles: [], note: "No matching article. Consider raising a ticket." },
         label: articles.length ? `Found fix guide: ${articles[0].title}` : "Searched the fix guides",
+        card: articles.length ? { kind: "fix", title: articles[0].title, steps: articles[0].steps } : undefined,
       };
     },
   },
@@ -219,7 +267,11 @@ const defs: Record<string, ToolDef> = {
         db.tickets.push(t);
         return t;
       });
-      return { result: { created: ticket }, label: `Raised ticket ${ticket.id} (${ticket.priority})` };
+      return {
+        result: { created: ticket },
+        label: `Raised ticket ${ticket.id} (${ticket.priority})`,
+        card: { kind: "ticket", action: "created", ticket: pickTicket(ticket) },
+      };
     },
   },
 
@@ -250,7 +302,13 @@ const defs: Record<string, ToolDef> = {
         .filter((t) => !input.device_id.trim() || t.deviceId === input.device_id.toUpperCase().trim())
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, 20);
-      return { result: { tickets }, label: `Listed ${tickets.length} ticket${tickets.length === 1 ? "" : "s"}` };
+      return {
+        result: { tickets },
+        label: `Listed ${tickets.length} ticket${tickets.length === 1 ? "" : "s"}`,
+        card: tickets.length
+          ? { kind: "tickets", tickets: tickets.slice(0, 6).map((t) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority })) }
+          : undefined,
+      };
     },
   },
 
@@ -280,7 +338,11 @@ const defs: Record<string, ToolDef> = {
         if (input.note.trim()) t.notes.push({ at: new Date().toISOString(), by: "IT staff (via assistant)", text: input.note });
         return t;
       });
-      return { result: { updated: ticket }, label: `Marked ${ticket.id} as ${ticket.status}` };
+      return {
+        result: { updated: ticket },
+        label: `Marked ${ticket.id} as ${ticket.status}`,
+        card: { kind: "ticket", action: "updated", ticket: pickTicket(ticket) },
+      };
     },
   },
 
@@ -310,7 +372,24 @@ const defs: Record<string, ToolDef> = {
           openTickets: db.tickets.filter((t) => t.deviceId === d.id && t.status !== "resolved").length,
         }))
         .sort((a, b) => b.repairs - a.repairs || b.ageYears - a.ageYears);
-      return { result: { today: new Date().toISOString().slice(0, 10), devices }, label: "Pulled the fleet report" };
+      const worst = db.devices
+        .filter((d) => d.status !== "retired")
+        .map((d) => ({ d, h: deviceHealth(d, db.repairs) }))
+        .sort((a, b) => a.h.score - b.h.score)
+        .slice(0, 5)
+        .map(({ d, h }) => ({
+          id: d.id,
+          model: d.model,
+          owner: db.employees.find((e) => e.id === d.assignedTo)?.name ?? "Unassigned",
+          score: h.score,
+          label: h.label,
+          reasons: h.reasons,
+        }));
+      return {
+        result: { today: new Date().toISOString().slice(0, 10), devices },
+        label: "Pulled the fleet report",
+        card: { kind: "fleet", devices: worst },
+      };
     },
   },
 };
@@ -342,7 +421,7 @@ export async function runTool(
   }
   try {
     const out = await def.run(parsed.data as never, actor);
-    return { content: JSON.stringify(out.result), isError: false, step: { tool: name, label: out.label, ok: true } };
+    return { content: JSON.stringify(out.result), isError: false, step: { tool: name, label: out.label, ok: true, card: out.card } };
   } catch (err) {
     const message = err instanceof ToolError ? err.message : "Internal error while running the tool.";
     if (!(err instanceof ToolError)) console.error(`[tool ${name}]`, err);

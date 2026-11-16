@@ -9,32 +9,52 @@ import {
   AlertTriangle,
   ArrowUp,
   BarChart3,
+  CornerDownRight,
   Gauge,
+  History,
   ListChecks,
   Printer,
   RefreshCw,
-  History,
-  SquarePen,
   Sparkles,
+  Square,
+  SquarePen,
   Ticket,
   Wifi,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
+import { AgentTimeline, type LiveStep } from "@/components/chat/AgentTimeline";
+import { ChatCardView, cardsFrom } from "@/components/chat/ChatCards";
+import { followUps } from "@/components/chat/suggestions";
 import { ChatHistoryList } from "@/components/history/ChatHistoryList";
 import { ASK_EVENT } from "@/components/shell/CommandMenu";
+import { PENDING_ASK_KEY } from "@/components/shell/nav";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { ConversationSummary } from "@/lib/conversations";
-import type { ChatMessage } from "@/lib/types";
-import { toast } from "sonner";
-import { PENDING_ASK_KEY } from "@/components/shell/nav";
+import type { ChatCard, ChatMessage, ChatStep } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Step = { tool: string; label: string; ok: boolean };
-type Message =
-  | { id: number; role: "user"; text: string }
-  | { id: number; role: "assistant"; text: string; steps: Step[] }
-  | { id: number; role: "error"; text: string; retry: string };
+type UserMsg = { id: number; role: "user"; text: string };
+type AssistantMsg = {
+  id: number;
+  role: "assistant";
+  text: string;
+  steps: LiveStep[];
+  cards: ChatCard[];
+  status: "working" | "done" | "stopped";
+  seconds?: number;
+};
+type ErrorMsg = { id: number; role: "error"; text: string; retry: string };
+type Message = UserMsg | AssistantMsg | ErrorMsg;
+
+type ServerEvent =
+  | { type: "start"; conversationId: string }
+  | { type: "tool_start"; id: string; tool: string; label: string }
+  | { type: "tool_end"; id: string; step: ChatStep }
+  | { type: "text"; delta: string }
+  | { type: "done"; reply: string; steps: ChatStep[] }
+  | { type: "error"; message: string };
 
 type Prompt = { text: string; hint: string; icon: LucideIcon };
 
@@ -50,19 +70,6 @@ const STAFF_PROMPTS: Prompt[] = [
   { text: "What has gone wrong with DSK-201?", hint: "Repair history", icon: Wrench },
   { text: "Mark TCK-1002 as in progress, driver reinstall scheduled", hint: "Updates the ticket", icon: Ticket },
 ];
-
-const STEP_ICON: Record<string, string> = {
-  get_my_devices: "💻",
-  find_employee: "🔎",
-  get_device_details: "🗂️",
-  search_known_fixes: "📘",
-  create_ticket: "🎫",
-  list_tickets: "📋",
-  update_ticket: "✅",
-  get_fleet_report: "📊",
-};
-
-const THINKING = ["Reading your message", "Checking the records", "Looking for a fix", "Putting the answer together"];
 
 const enter = { initial: { opacity: 0, y: 12, scale: 0.98 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -6 } };
 const spring = { type: "spring", stiffness: 380, damping: 32 } as const;
@@ -82,19 +89,19 @@ export function AssistantAvatar({ className }: { className?: string }) {
   );
 }
 
-function Thinking() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const phrase = THINKING[Math.min(Math.floor(tick / 4), THINKING.length - 1)];
-  return (
-    <motion.div {...enter} transition={spring} className="flex items-center gap-3" aria-live="polite">
-      <AssistantAvatar className="animate-pulse" />
-      <span className="shimmer-text text-[15px] font-medium">{phrase}…</span>
-      <span className="tabular text-xs text-muted-foreground">{tick}s</span>
-    </motion.div>
+function fromSaved(messages: ChatMessage[]): Message[] {
+  return messages.map((m, i) =>
+    m.role === "user"
+      ? { id: i + 1, role: "user", text: m.text }
+      : {
+          id: i + 1,
+          role: "assistant",
+          text: m.text,
+          status: "done",
+          seconds: i > 0 ? Math.max(0, (Date.parse(m.at) - Date.parse(messages[i - 1].at)) / 1000) : undefined,
+          steps: m.steps.map((s, j) => ({ id: `${i}-${j}`, tool: s.tool, label: s.label, state: s.ok ? "done" : "failed" })),
+          cards: m.steps.flatMap((s) => (s.card ? [s.card] : [])),
+        },
   );
 }
 
@@ -109,9 +116,7 @@ type Props = {
 
 export default function Chat({ firstName, isStaff, conversationId: savedId, initialMessages, recent, missing }: Props) {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>(() =>
-    initialMessages.map((m, i) => (m.role === "user" ? { id: i + 1, role: "user", text: m.text } : { id: i + 1, role: "assistant", text: m.text, steps: m.steps })),
-  );
+  const [messages, setMessages] = useState<Message[]>(() => fromSaved(initialMessages));
   const [conversationId, setConversationId] = useState<string | null>(savedId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -120,46 +125,117 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
   const idRef = useRef(initialMessages.length);
+  const abortRef = useRef<AbortController | null>(null);
+  const stickRef = useRef(true);
+  const pendingIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (missing) toast.error("That conversation isn\u2019t available for this profile.");
+    if (missing) toast.error("That conversation isn’t available for this profile.");
   }, [missing]);
 
+  // Follow the conversation while it streams, unless the reader scrolled up.
   useEffect(() => {
     const el = scrollRef.current;
-    el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (el && stickRef.current) el.scrollTo({ top: el.scrollHeight, behavior: busy ? "auto" : "smooth" });
   }, [messages, busy]);
+
+  const updateAssistant = (id: number, change: (m: AssistantMsg) => AssistantMsg) =>
+    setMessages((all) => all.map((m) => (m.id === id && m.role === "assistant" ? change(m) : m)));
 
   const send = useCallback(
     async (text: string, opts: { retry?: boolean } = {}) => {
       const message = text.trim();
       if (!message || busyRef.current) return;
       busyRef.current = true;
+      stickRef.current = true;
       setInput("");
+      // Take both IDs now: state updaters run later, after the counter has moved on.
+      const userId = ++idRef.current;
+      const replyId = ++idRef.current;
       setMessages((m) => {
-        const kept = opts.retry ? m.filter((x) => x.role !== "error") : m;
-        return opts.retry ? kept : [...kept, { id: ++idRef.current, role: "user", text: message }];
+        const kept = opts.retry ? m.filter((x) => x.role !== "error") : [...m, { id: userId, role: "user" as const, text: message }];
+        return [...kept, { id: replyId, role: "assistant", text: "", steps: [], cards: [], status: "working" }];
       });
       setBusy(true);
+      const started = performance.now();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const fail = (reason: string) => {
+        const errorId = ++idRef.current;
+        setMessages((all) => [...all.filter((m) => m.id !== replyId), { id: errorId, role: "error", text: reason, retry: message }]);
+      };
+
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ conversationId, message }),
+          signal: controller.signal,
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
-        setMessages((m) => [...m, { id: ++idRef.current, role: "assistant", text: data.reply, steps: data.steps }]);
-        if (!conversationId) {
-          // First reply: the conversation is now saved, so give it its own address.
-          setConversationId(data.conversationId);
-          window.history.replaceState(null, "", `/?c=${data.conversationId}`);
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Something went wrong. Please try again.");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finished = false;
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const e = JSON.parse(line) as ServerEvent;
+            if (e.type === "tool_start") {
+              // Any text before a tool call was a preamble; the real answer comes after.
+              updateAssistant(replyId, (m) => ({ ...m, text: "", steps: [...m.steps, { id: e.id, tool: e.tool, label: e.label, state: "running" }] }));
+            } else if (e.type === "tool_end") {
+              updateAssistant(replyId, (m) => ({
+                ...m,
+                steps: m.steps.map((s) => (s.id === e.id ? { ...s, label: e.step.label, state: e.step.ok ? "done" : "failed" } : s)),
+                cards: e.step.card ? [...m.cards, e.step.card] : m.cards,
+              }));
+            } else if (e.type === "text") {
+              updateAssistant(replyId, (m) => ({ ...m, text: m.text + e.delta }));
+            } else if (e.type === "done") {
+              finished = true;
+              const seconds = (performance.now() - started) / 1000;
+              updateAssistant(replyId, (m) => ({ ...m, text: e.reply, status: "done", seconds }));
+            } else if (e.type === "start" && !conversationId) {
+              pendingIdRef.current = e.conversationId;
+            } else if (e.type === "error") {
+              finished = true;
+              fail(e.message);
+            }
+          }
+        }
+        if (!finished) throw new Error("The connection dropped before the answer finished.");
+
+        // The turn is saved now; give a new conversation its own address.
+        if (!conversationId && pendingIdRef.current) {
+          setConversationId(pendingIdRef.current);
+          window.history.replaceState(null, "", `/?c=${pendingIdRef.current}`);
         }
         router.refresh(); // new tickets and the saved chat show up in the rail and panels
       } catch (err) {
-        const msg = err instanceof Error && err.message !== "Failed to fetch" ? err.message : "Can't reach the server. Check your connection.";
-        setMessages((m) => [...m, { id: ++idRef.current, role: "error", text: msg, retry: message }]);
+        if (controller.signal.aborted) {
+          updateAssistant(replyId, (m) => ({
+            ...m,
+            status: "stopped",
+            steps: m.steps.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)),
+          }));
+        } else {
+          const msg = err instanceof Error && err.message !== "Failed to fetch" ? err.message : "Can't reach the server. Check your connection.";
+          fail(msg);
+        }
       } finally {
+        pendingIdRef.current = null;
+        abortRef.current = null;
         busyRef.current = false;
         setBusy(false);
         inputRef.current?.focus();
@@ -190,7 +266,12 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
+  function stop() {
+    abortRef.current?.abort();
+  }
+
   function reset() {
+    stop();
     setMessages([]);
     setConversationId(null);
     window.history.replaceState(null, "", "/");
@@ -199,6 +280,7 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
 
   const prompts = isStaff ? STAFF_PROMPTS : EMPLOYEE_PROMPTS;
   const empty = messages.length === 0 && !busy;
+  const lastAssistant = [...messages].reverse().find((m): m is AssistantMsg => m.role === "assistant");
 
   return (
     <section className="relative flex h-full min-w-0 flex-1 flex-col" aria-label="Assistant chat">
@@ -225,7 +307,15 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
           </button>
         )}
       </div>
-      <div ref={scrollRef} className="fade-y min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-2">
+
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+        className="fade-y min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-2"
+      >
         <div className="mx-auto flex min-h-full max-w-3xl flex-col py-6">
           <AnimatePresence mode="popLayout" initial={false}>
             {empty ? (
@@ -294,7 +384,7 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
                     m.role === "user" ? (
                       <motion.div
                         key={m.id}
-                        layout
+                        layout="position"
                         {...enter}
                         transition={spring}
                         className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] whitespace-pre-wrap text-primary-foreground shadow-[0_8px_24px_-12px] shadow-primary/60"
@@ -302,7 +392,7 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
                         {m.text}
                       </motion.div>
                     ) : m.role === "error" ? (
-                      <motion.div key={m.id} layout {...enter} transition={spring} role="alert" className="glass flex items-start gap-3 rounded-2xl border-rose-500/25 p-4">
+                      <motion.div key={m.id} layout="position" {...enter} transition={spring} role="alert" className="glass flex items-start gap-3 rounded-2xl p-4">
                         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-rose-500/12 text-rose-600 dark:text-rose-300">
                           <AlertTriangle className="size-4" />
                         </span>
@@ -319,37 +409,51 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
                         </button>
                       </motion.div>
                     ) : (
-                      <motion.div key={m.id} layout {...enter} transition={spring} className="flex gap-3">
-                        <AssistantAvatar />
-                        <div className="flex min-w-0 flex-1 flex-col gap-2.5 pt-0.5">
-                          {m.steps.length > 0 && (
-                            <ul className="flex flex-wrap gap-1.5" aria-label="What the assistant did">
-                              {m.steps.map((s, j) => (
-                                <motion.li
-                                  key={j}
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: j * 0.07 }}
-                                  className={cn(
-                                    "rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
-                                    s.ok
-                                      ? "bg-ai-soft text-ai-strong ring-amber-500/20"
-                                      : "bg-rose-500/10 text-rose-700 ring-rose-500/25 dark:text-rose-300",
-                                  )}
-                                >
-                                  {STEP_ICON[s.tool] ?? "⚙️"} {s.label}
-                                </motion.li>
+                      <motion.div key={m.id} layout="position" {...enter} transition={spring} className="flex gap-3">
+                        <AssistantAvatar className={cn(m.status === "working" && "animate-pulse")} />
+                        <div className="flex min-w-0 flex-1 flex-col gap-3 pt-0.5">
+                          <AgentTimeline steps={m.steps} working={m.status === "working"} seconds={m.seconds} />
+
+                          {cardsFrom(m.cards).length > 0 && (
+                            <div className="grid gap-2.5">
+                              {cardsFrom(m.cards).map((c, j) => (
+                                <ChatCardView key={j} card={c} />
                               ))}
-                            </ul>
+                            </div>
                           )}
-                          <div className="glass chat-markdown rounded-2xl rounded-tl-md px-4 py-3 text-[15px] leading-relaxed [&_table]:my-2 [&_table]:w-full [&_table]:text-sm [&_td]:border-t [&_td]:py-1.5 [&_td]:pr-3 [&_th]:pr-3 [&_th]:pb-1 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
-                          </div>
+
+                          {(m.text || m.status === "stopped") && (
+                            <div className="glass chat-markdown rounded-2xl rounded-tl-md px-4 py-3 text-[15px] leading-relaxed [&_table]:my-2 [&_table]:w-full [&_table]:text-sm [&_td]:border-t [&_td]:py-1.5 [&_td]:pr-3 [&_th]:pr-3 [&_th]:pb-1 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground">
+                              {m.text && <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>}
+                              {m.status === "working" && m.text && (
+                                <span className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse rounded-sm bg-ai align-baseline" aria-hidden />
+                              )}
+                              {m.status === "stopped" && <p className="mt-1 text-sm text-muted-foreground italic">Stopped. Nothing from this reply was saved.</p>}
+                            </div>
+                          )}
+
+                          {m === lastAssistant && m.status === "done" && !busy && (
+                            <div className="flex flex-wrap gap-2">
+                              {followUps(m.cards, isStaff).map((s, j) => (
+                                <motion.button
+                                  key={s}
+                                  type="button"
+                                  initial={{ opacity: 0, y: 6 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: 0.2 + j * 0.07 }}
+                                  onClick={() => send(s)}
+                                  className="glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/80 transition-all hover:-translate-y-px hover:text-foreground"
+                                >
+                                  <CornerDownRight className="size-3.5 text-primary" />
+                                  {s}
+                                </motion.button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     ),
                   )}
-                  {busy && <Thinking key="thinking" />}
                 </AnimatePresence>
               </div>
             )}
@@ -381,7 +485,7 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
             className="max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[15px] leading-6 outline-none placeholder:text-muted-foreground"
           />
           <AnimatePresence>
-            {messages.length > 0 && (
+            {messages.length > 0 && !busy && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -396,15 +500,32 @@ export default function Chat({ firstName, isStaff, conversationId: savedId, init
               </motion.button>
             )}
           </AnimatePresence>
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            type="submit"
-            disabled={busy || !input.trim()}
-            aria-label="Send"
-            className="bg-brand grid size-10 shrink-0 place-items-center rounded-xl text-white shadow-[0_8px_20px_-8px] shadow-primary/70 transition-opacity disabled:opacity-40 disabled:shadow-none"
-          >
-            <ArrowUp className="size-[18px]" />
-          </motion.button>
+          {busy ? (
+            <motion.button
+              key="stop"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              whileTap={{ scale: 0.92 }}
+              type="button"
+              onClick={stop}
+              aria-label="Stop"
+              title="Stop"
+              className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background"
+            >
+              <Square className="size-3.5 fill-current" />
+            </motion.button>
+          ) : (
+            <motion.button
+              key="send"
+              whileTap={{ scale: 0.92 }}
+              type="submit"
+              disabled={!input.trim()}
+              aria-label="Send"
+              className="bg-brand grid size-10 shrink-0 place-items-center rounded-xl text-white shadow-[0_8px_20px_-8px] shadow-primary/70 transition-opacity disabled:opacity-40 disabled:shadow-none"
+            >
+              <ArrowUp className="size-[18px]" />
+            </motion.button>
+          )}
         </form>
         <p className="mx-auto mt-2 hidden max-w-3xl text-center text-[11px] text-muted-foreground md:block">
           Enter to send · Shift + Enter for a new line · ⌘K to search

@@ -32,7 +32,7 @@ User message
 Plain-language answer + list of actions taken
 ```
 
-- **The loop** ([src/lib/agent.ts](src/lib/agent.ts)) sends the conversation and the tool list to the model. If the model asks for tools, the app runs them (in parallel when there are several), sends the results back, and repeats. It stops when the model answers in text, or after 8 rounds as a safety limit.
+- **The loop** ([src/lib/agent.ts](src/lib/agent.ts)) streams the conversation and the tool list to the model and passes live events (tool started, tool finished with card data, text) to the browser as newline-delimited JSON. If the model asks for tools, the app runs them (in parallel when there are several), sends the results back, and repeats. It stops when the model answers in text, or after 8 rounds as a safety limit.
 - **Tools** ([src/lib/tools.ts](src/lib/tools.ts)):
 
   | Tool | Employee | IT staff |
@@ -63,7 +63,9 @@ Next.js 16 (App Router, Server Components, Server Actions) · TypeScript · Tail
 
 - "Floating glass workspace": frosted panels over a slowly drifting aurora background, a collapsible glass rail, and a floating dock on phones.
 - Teal for the product, warm amber reserved for the assistant, so warm always means "the AI did this".
-- Chat with a pinned composer, animated messages, a live "thinking" state, and error cards with Retry.
+- **Streaming agent UI:** the answer appears word by word, and a live timeline shows each tool call as it starts (spinner), finishes (tick) or is blocked. Once the turn ends it folds into a "4 steps · 9.8s" chip you can expand.
+- **Generative UI cards:** tools return structured data the chat shows as cards: a device card with an animated health ring and repair timeline, a "ticket raised" card, a tickets list, a fleet health chart, and a "Try this first" checklist you can tick off.
+- **Stop, Retry and follow-ups:** stop a reply mid-way (nothing half-finished is saved), retry after a network error, and tap suggested follow-up questions based on what the agent just did.
 - **Saved chat history per profile:** "Recent chats" in the rail (newest first, grouped by day), each chat at its own address, delete with confirm, and a History sheet on phones. Only the profile that started a chat can open it.
 - Context panel beside the chat: your devices with a health score, and your latest tickets. It refreshes after every reply.
 - Motion (Framer Motion): page transitions, a sliding active highlight in the menu and filters, spring-in messages, staggered lists.
